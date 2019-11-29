@@ -3,7 +3,6 @@ package s3
 import (
 	"errors"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/smartystreets/assertions/should"
 	. "github.com/smartystreets/goconvey/convey"
 	"io/ioutil"
 	"os"
@@ -63,7 +62,7 @@ func TestS3Uploader_Upload(t *testing.T) {
 		Convey("Should close file after upload", func() {
 			_, err = ioutil.ReadAll(inputPassed.Body)
 			So(err, ShouldNotBeNil)
-			So(err, should.HaveSameTypeAs, &os.PathError{})
+			So(err, ShouldHaveSameTypeAs, &os.PathError{})
 			So(err.Error(), ShouldContainSubstring, "already closed")
 		})
 	})
@@ -80,7 +79,7 @@ func TestS3Uploader_Upload(t *testing.T) {
 		err := uploader.Upload("a nonexistent path")
 
 		So(err, ShouldNotBeNil)
-		So(err, should.HaveSameTypeAs, &os.PathError{})
+		So(err, ShouldHaveSameTypeAs, &os.PathError{})
 		So(err.Error(), ShouldContainSubstring, "no such file or directory")
 	})
 
