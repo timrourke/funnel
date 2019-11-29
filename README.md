@@ -1,5 +1,7 @@
 # funnel
 
+[![CircleCI](https://circleci.com/gh/timrourke/funnel.svg?style=svg)](https://circleci.com/gh/timrourke/funnel)
+
 ```
 Funnel is a tool for quickly saving files to AWS S3.
 
