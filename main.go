@@ -78,6 +78,8 @@ func init() {
 		false,
 		"Whether to watch a path for changes",
 	)
+
+	rootCmd.DisableFlagsInUseLine = true
 }
 
 func main() {
