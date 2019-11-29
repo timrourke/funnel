@@ -102,5 +102,4 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, "must provide at least one path to a file or directory to upload to AWS S3")
 	})
-
 }
