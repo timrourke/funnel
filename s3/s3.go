@@ -2,7 +2,6 @@ package s3
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"log"
 	"os"
@@ -12,9 +11,13 @@ type S3Uploader interface {
 	Upload(path string) error
 }
 
+type S3ManagerUploader interface {
+	Upload(input *s3manager.UploadInput, options ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error)
+}
+
 type s3Uploader struct {
 	toBucket string
-	s3UploadManager *s3manager.Uploader
+	s3UploadManager S3ManagerUploader
 }
 
 func (s *s3Uploader) Upload(path string) error {
@@ -39,15 +42,9 @@ func (s *s3Uploader) Upload(path string) error {
 	return nil
 }
 
-func NewS3Uploader(forAwsRegion string, toBucket string) S3Uploader {
-	config := aws.NewConfig().
-		WithRegion(forAwsRegion).
-		WithMaxRetries(3)
-
-	sess := session.Must(session.NewSession(config))
-
+func NewS3Uploader(s3UploadManager S3ManagerUploader, toBucket string) S3Uploader {
 	return &s3Uploader{
 		toBucket: toBucket,
-		s3UploadManager: s3manager.NewUploader(sess),
+		s3UploadManager: s3UploadManager,
 	}
 }

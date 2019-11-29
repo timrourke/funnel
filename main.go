@@ -3,6 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/spf13/cobra"
 	"github.com/timrourke/funnel/s3"
 	"github.com/timrourke/funnel/upload"
@@ -37,7 +40,15 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		uploader := s3.NewS3Uploader(region, bucket)
+		config := aws.NewConfig().
+			WithRegion(region).
+			WithMaxRetries(3)
+
+		sess := session.Must(session.NewSession(config))
+
+		s3UploadManager := s3manager.NewUploader(sess)
+
+		uploader := s3.NewS3Uploader(s3UploadManager, bucket)
 
 		return upload.UploadFilesFromPathToBucket(args, shouldWatchPaths, uploader)
 	},
