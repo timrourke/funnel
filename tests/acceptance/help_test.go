@@ -25,6 +25,11 @@ func compileExecutable(t *testing.T) {
 		t.Fatal("failed to build binary", string(buildOutput), err)
 	}
 
+	err = os.Chdir("/tmp")
+	if err != nil {
+		t.Fatal("failed to change dirs to /tmp dir", err)
+	}
+
 	didCompileExecutable = true
 }
 
