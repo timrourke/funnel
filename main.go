@@ -30,10 +30,10 @@ var region string
 var shouldWatchPaths bool
 
 var rootCmd = &cobra.Command{
-	Use:                        "funnel [OPTIONS] [PATHS]",
-	Short:                      "Funnel is a tool for quickly saving files to AWS S3.",
-	Example:                    "funnel --region=us-east-1 --bucket=some-cool-bucket /some/directory",
-	Version:                    "0.0.1",
+	Use:     "funnel [OPTIONS] [PATHS]",
+	Short:   "Funnel is a tool for quickly saving files to AWS S3.",
+	Example: "funnel --region=us-east-1 --bucket=some-cool-bucket /some/directory",
+	Version: "0.0.1",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateCommandLineFlags()
 		if err != nil {

@@ -10,9 +10,9 @@ import (
 )
 
 type stubS3ManagerUploader struct {
-	inputsPassed []*s3manager.UploadInput
+	inputsPassed         []*s3manager.UploadInput
 	expectedReturnValues []*s3manager.UploadOutput
-	expectedErrorValues []error
+	expectedErrorValues  []error
 }
 
 func (s *stubS3ManagerUploader) Upload(input *s3manager.UploadInput, options ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {

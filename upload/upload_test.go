@@ -10,7 +10,7 @@ import (
 )
 
 type stubS3ManagerUploader struct {
-	inputsPassed 		 chan *s3manager.UploadInput
+	inputsPassed         chan *s3manager.UploadInput
 	expectedReturnValues chan *s3manager.UploadOutput
 	expectedErrorValues  chan error
 }
@@ -18,7 +18,7 @@ type stubS3ManagerUploader struct {
 func (s *stubS3ManagerUploader) Upload(input *s3manager.UploadInput, options ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
 	s.inputsPassed <- input
 
-	return <- s.expectedReturnValues, <- s.expectedErrorValues
+	return <-s.expectedReturnValues, <-s.expectedErrorValues
 }
 
 func TestUploadFilesFromPathToBucket(t *testing.T) {

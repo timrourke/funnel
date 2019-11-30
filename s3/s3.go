@@ -16,7 +16,7 @@ type S3ManagerUploader interface {
 }
 
 type s3Uploader struct {
-	toBucket string
+	toBucket        string
 	s3UploadManager S3ManagerUploader
 }
 
@@ -29,9 +29,9 @@ func (s *s3Uploader) Upload(path string) error {
 	defer file.Close()
 
 	input := &s3manager.UploadInput{
-		Body: file,
+		Body:   file,
 		Bucket: aws.String(s.toBucket),
-		Key: aws.String(path),
+		Key:    aws.String(path),
 	}
 
 	_, err = s.s3UploadManager.Upload(input)
@@ -44,7 +44,7 @@ func (s *s3Uploader) Upload(path string) error {
 
 func NewS3Uploader(s3UploadManager S3ManagerUploader, toBucket string) S3Uploader {
 	return &s3Uploader{
-		toBucket: toBucket,
+		toBucket:        toBucket,
 		s3UploadManager: s3UploadManager,
 	}
 }
