@@ -14,11 +14,11 @@ import (
 )
 
 func validateCommandLineFlags() error {
-	if "" == strings.Trim(region, " ") {
+	if "" == strings.TrimSpace(region) {
 		return errors.New("must provide an AWS region where your S3 bucket exists")
 	}
 
-	if "" == strings.Trim(bucket, " ") {
+	if "" == strings.TrimSpace(bucket) {
 		return errors.New("must specify an AWS S3 bucket to save files in")
 	}
 
@@ -35,9 +35,9 @@ var rootCmd = &cobra.Command{
 	Example:                    "funnel --region=us-east-1 --bucket=some-cool-bucket /some/directory",
 	Version:                    "0.0.1",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := validateCommandLineFlags(); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+		err := validateCommandLineFlags()
+		if err != nil {
+			return err
 		}
 
 		config := aws.NewConfig().
@@ -62,6 +62,9 @@ func init() {
 		"",
 		"The AWS region your S3 bucket is in, eg. \"us-east-1\"",
 	)
+	if "" == strings.TrimSpace(region) {
+		region = os.Getenv("AWS_DEFAULT_REGION")
+	}
 
 	rootCmd.PersistentFlags().StringVarP(
 		&bucket,
