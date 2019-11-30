@@ -37,7 +37,7 @@ func TestHelpMenu(t *testing.T) {
 	compileExecutable(t)
 
 	Convey("Should show help menu", t, func() {
-		cmd := exec.Command("funnel", "-h")
+		cmd := exec.Command("./funnel", "-h")
 		cmdOutput, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatal(string(cmdOutput))
