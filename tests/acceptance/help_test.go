@@ -19,7 +19,7 @@ func compileExecutable(t *testing.T) {
 		t.Fatal("failed to change dirs", err)
 	}
 
-	build := exec.Command("go", "build", ".")
+	build := exec.Command("go", "build", "-o", "/tmp", ".")
 	buildOutput, err := build.CombinedOutput()
 	if err != nil {
 		t.Fatal("failed to build binary", string(buildOutput), err)
