@@ -18,6 +18,15 @@ func (u *uploader) handlePending(
 ) {
 	for input := range pending {
 		err := u.s3Uploader.Upload(input.path)
+		if err == nil && u.shouldDeleteFileAfterUpload {
+			err = os.Remove(input.path)
+			if err != nil {
+				u.logger.WithFields(logrus.Fields{
+					"filename": input.path,
+					"error":    err.Error(),
+				}).Fatal(fmt.Sprintf("Failed to delete file after upload: %s", input.path))
+			}
+		}
 		if err == nil {
 			completed <- input
 			continue
@@ -137,18 +146,20 @@ type Uploader interface {
 }
 
 type uploader struct {
-	logger               *logrus.Logger
-	numConcurrentUploads int
-	shouldWatchPaths     bool
-	s3Uploader           s3.S3Uploader
+	logger                      *logrus.Logger
+	numConcurrentUploads        int
+	shouldDeleteFileAfterUpload bool
+	shouldWatchPaths            bool
+	s3Uploader                  s3.S3Uploader
 }
 
-func NewUploader(shouldWatchPaths bool, numConcurrentUploads int, s3Uploader s3.S3Uploader, logger *logrus.Logger) Uploader {
+func NewUploader(shouldDeleteFileAfterUpload bool, shouldWatchPaths bool, numConcurrentUploads int, s3Uploader s3.S3Uploader, logger *logrus.Logger) Uploader {
 	return &uploader{
-		logger:               logger,
-		numConcurrentUploads: numConcurrentUploads,
-		shouldWatchPaths:     shouldWatchPaths,
-		s3Uploader:           s3Uploader,
+		logger:                      logger,
+		numConcurrentUploads:        numConcurrentUploads,
+		shouldDeleteFileAfterUpload: shouldDeleteFileAfterUpload,
+		shouldWatchPaths:            shouldWatchPaths,
+		s3Uploader:                  s3Uploader,
 	}
 }
 

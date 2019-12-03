@@ -31,11 +31,12 @@ func validateCommandLineFlags() error {
 }
 
 var (
-	bucket               string
-	log                  = logrus.New()
-	numConcurrentUploads int
-	shouldWatchPaths     bool
-	region               string
+	bucket                      string
+	log                         = logrus.New()
+	numConcurrentUploads        int
+	shouldDeleteFileAfterUpload bool
+	shouldWatchPaths            bool
+	region                      string
 
 	rootCmd = &cobra.Command{
 		Use:     "funnel [OPTIONS] [PATHS]",
@@ -59,6 +60,7 @@ var (
 			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket)
 
 			uploader := upload.NewUploader(
+				shouldDeleteFileAfterUpload,
 				shouldWatchPaths,
 				numConcurrentUploads,
 				s3Uploader,
@@ -110,6 +112,14 @@ func configureRootCmd() {
 		"n",
 		10,
 		"Number of concurrent uploads",
+	)
+
+	rootCmd.PersistentFlags().BoolVarP(
+		&shouldDeleteFileAfterUpload,
+		"should-delete-file-after-upload",
+		"",
+		false,
+		"Whether to delete the uploaded file after a successful upload",
 	)
 
 	rootCmd.DisableFlagsInUseLine = true
