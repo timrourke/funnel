@@ -2,6 +2,7 @@ package upload
 
 import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/sirupsen/logrus"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/timrourke/funnel/s3"
 	"io/ioutil"
@@ -42,8 +43,11 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 			c.So(*inputPassed.Key, ShouldEqual, file.Name())
 		}()
 
-		uploader := s3.NewS3Uploader(stub, "unimportant")
-		err = UploadFilesFromPathToBucket([]string{file.Name()}, false, uploader)
+		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
+
+		uploader := NewUploader(false, s3Uploader, logrus.New())
+
+		err = uploader.UploadFilesFromPathToBucket([]string{file.Name()})
 
 		c.So(err, ShouldBeNil)
 	})
@@ -86,8 +90,10 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 			c.So(len(uploadedKeys), ShouldEqual, 2)
 		}()
 
-		uploader := s3.NewS3Uploader(stub, "unimportant")
-		err = UploadFilesFromPathToBucket([]string{dirname}, false, uploader)
+		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
+
+		uploader := NewUploader(false, s3Uploader, logrus.New())
+		err = uploader.UploadFilesFromPathToBucket([]string{dirname})
 		c.So(err, ShouldBeNil)
 	})
 
@@ -98,8 +104,10 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 			expectedErrorValues:  nil,
 		}
 
-		uploader := s3.NewS3Uploader(stub, "unimportant")
-		err := UploadFilesFromPathToBucket([]string{}, false, uploader)
+		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
+
+		uploader := NewUploader(false, s3Uploader, logrus.New())
+		err := uploader.UploadFilesFromPathToBucket([]string{})
 
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, "must provide at least one path to a file or directory to upload to AWS S3")

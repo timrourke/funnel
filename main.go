@@ -51,9 +51,11 @@ var (
 
 			s3UploadManager := s3manager.NewUploader(sess)
 
-			uploader := s3.NewS3Uploader(s3UploadManager, bucket)
+			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket)
 
-			return upload.UploadFilesFromPathToBucket(args, shouldWatchPaths, uploader)
+			uploader := upload.NewUploader(shouldWatchPaths, s3Uploader, log)
+
+			return uploader.UploadFilesFromPathToBucket(args)
 		},
 	}
 )

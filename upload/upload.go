@@ -2,22 +2,21 @@ package upload
 
 import (
 	"errors"
+	"github.com/sirupsen/logrus"
 	"github.com/timrourke/funnel/s3"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 )
 
-func handlePending(
+func (u *uploader) handlePending(
 	pending chan *fileUploadJob,
 	completed chan<- *fileUploadJob,
 	failed chan<- *fileUploadJob,
-	uploader s3.S3Uploader,
 ) {
 	for input := range pending {
-		err := uploader.Upload(input.path)
+		err := u.s3Uploader.Upload(input.path)
 		if err == nil {
 			completed <- input
 			continue
@@ -35,7 +34,7 @@ func handlePending(
 	}
 }
 
-func enqueueDirContents(dirPathToWatch string, pending chan *fileUploadJob, wg *sync.WaitGroup) {
+func (u *uploader) enqueueDirContents(dirPathToWatch string, pending chan *fileUploadJob, wg *sync.WaitGroup) {
 	err := filepath.Walk(dirPathToWatch, func(path string, info os.FileInfo, err error) error {
 		if dirPathToWatch == path {
 			return nil
@@ -55,32 +54,32 @@ func enqueueDirContents(dirPathToWatch string, pending chan *fileUploadJob, wg *
 		return nil
 	})
 	if err != nil {
-		log.Fatal(err)
+		u.logger.Fatal(err)
 	}
 }
 
-func uploadDir(filePath string, pending chan *fileUploadJob, shouldWatchPaths bool, wg *sync.WaitGroup) {
-	if shouldWatchPaths {
+func (u *uploader) uploadDir(filePath string, pending chan *fileUploadJob, wg *sync.WaitGroup) {
+	if u.shouldWatchPaths {
 		for {
-			enqueueDirContents(filePath, pending, wg)
+			u.enqueueDirContents(filePath, pending, wg)
 
 			time.Sleep(1 * time.Second)
 		}
 	} else {
-		enqueueDirContents(filePath, pending, wg)
+		u.enqueueDirContents(filePath, pending, wg)
 	}
 }
 
-func processSingleFilePath(filePath string, pending chan *fileUploadJob, shouldWatchPaths bool, wg *sync.WaitGroup) error {
+func (u *uploader) processSingleFilePath(filePath string, pending chan *fileUploadJob, wg *sync.WaitGroup) error {
 	filePathInfo, err := os.Stat(filePath)
 	if err != nil {
 		return err
 	}
 
 	if filePathInfo.IsDir() {
-		uploadDir(filePath, pending, shouldWatchPaths, wg)
+		u.uploadDir(filePath, pending, wg)
 	} else {
-		if shouldWatchPaths {
+		if u.shouldWatchPaths {
 			for {
 				wg.Add(1)
 				pending <- &fileUploadJob{
@@ -104,7 +103,7 @@ func processSingleFilePath(filePath string, pending chan *fileUploadJob, shouldW
 	return nil
 }
 
-func processMultipleFilePaths(filePaths []string, pending chan *fileUploadJob, shouldWatchPaths bool, wg *sync.WaitGroup) error {
+func (u *uploader) processMultipleFilePaths(filePaths []string, pending chan *fileUploadJob, wg *sync.WaitGroup) error {
 	for _, filePath := range filePaths {
 		filePathInfo, err := os.Stat(filePath)
 		if err != nil {
@@ -112,7 +111,7 @@ func processMultipleFilePaths(filePaths []string, pending chan *fileUploadJob, s
 		}
 
 		if filePathInfo.IsDir() {
-			uploadDir(filePath, pending, shouldWatchPaths, wg)
+			u.uploadDir(filePath, pending, wg)
 		} else {
 			wg.Add(1)
 			pending <- &fileUploadJob{
@@ -127,12 +126,30 @@ func processMultipleFilePaths(filePaths []string, pending chan *fileUploadJob, s
 }
 
 type fileUploadJob struct {
-	path        string
-	errors      []error
-	startedAt   time.Time
+	path      string
+	errors    []error
+	startedAt time.Time
 }
 
-func UploadFilesFromPathToBucket(filePaths []string, shouldWatchPaths bool, uploader s3.S3Uploader) error {
+type Uploader interface {
+	UploadFilesFromPathToBucket(filePaths []string) error
+}
+
+type uploader struct {
+	logger           *logrus.Logger
+	shouldWatchPaths bool
+	s3Uploader       s3.S3Uploader
+}
+
+func NewUploader(shouldWatchPaths bool, s3Uploader s3.S3Uploader, logger *logrus.Logger) Uploader {
+	return &uploader{
+		logger:           logger,
+		shouldWatchPaths: shouldWatchPaths,
+		s3Uploader:       s3Uploader,
+	}
+}
+
+func (u *uploader) UploadFilesFromPathToBucket(filePaths []string) error {
 	if 0 == len(filePaths) {
 		return errors.New("must provide at least one path to a file or directory to upload to AWS S3")
 	}
@@ -142,13 +159,13 @@ func UploadFilesFromPathToBucket(filePaths []string, shouldWatchPaths bool, uplo
 	pending, completed, failed := make(chan *fileUploadJob), make(chan *fileUploadJob), make(chan *fileUploadJob)
 
 	for i := 0; i < 20; i++ {
-		go handlePending(pending, completed, failed, uploader)
+		go u.handlePending(pending, completed, failed)
 	}
 
 	go func() {
 		for output := range completed {
 			uploadDuration := time.Now().Sub(output.startedAt)
-			log.Printf("Uploaded file %s, took: %v", output.path, uploadDuration)
+			u.logger.Printf("Uploaded file %s, took: %v", output.path, uploadDuration)
 			wg.Done()
 		}
 	}()
@@ -156,22 +173,22 @@ func UploadFilesFromPathToBucket(filePaths []string, shouldWatchPaths bool, uplo
 	go func() {
 		for failure := range failed {
 			failedDuration := time.Now().Sub(failure.startedAt)
-			log.Printf("Failed to upload file %s with errors %s, took: %v", failure.path, failure.errors, failedDuration)
+			u.logger.Printf("Failed to upload file %s with errors %s, took: %v", failure.path, failure.errors, failedDuration)
 			wg.Done()
 		}
 	}()
 
 	if 1 == len(filePaths) {
-		err := processSingleFilePath(filePaths[0], pending, shouldWatchPaths, &wg)
+		err := u.processSingleFilePath(filePaths[0], pending, &wg)
 		if err != nil {
 			return err
 		}
 	} else {
-		if shouldWatchPaths {
+		if u.shouldWatchPaths {
 			return errors.New("watching multiple paths not supported")
 		}
 
-		err := processMultipleFilePaths(filePaths, pending, shouldWatchPaths, &wg)
+		err := u.processMultipleFilePaths(filePaths, pending, &wg)
 		if err != nil {
 			return err
 		}
