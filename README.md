@@ -20,3 +20,24 @@ Flags:
       --version                      version for funnel
   -w, --watch                        Whether to watch a path for changes
 ```
+
+## Building funnel from source
+
+1. Install [golang](https://golang.org/) and [dep](https://golang.github.io/dep/)
+2. Clone this repository to within your [GOPATH](https://github.com/golang/go/wiki/GOPATH)
+3. Run `dep ensure` from within the repository to install its dependencies
+4. Run `go build .` to compile the `funnel` binary
+5. Move the `funnel` binary to somewhere on your `$PATH` and upload some stuff
+
+## Setting the AWS region
+
+`funnel` will respect the environment variable `AWS_DEFAULT_REGION` if one is
+set. Otherwise, pass the AWS region as a CLI flag.
+
+## Watching paths for changes
+
+If you want to continually poll a directory for new files and upload them, you
+can use the `--watch` flag to enable this behavior. This may be especially
+useful in the case you want to also delete files following successful upload.
+This will allow you to constantly sync a directory's new contents to an S3
+bucket without filling up your disk.
