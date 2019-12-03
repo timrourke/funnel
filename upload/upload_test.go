@@ -45,7 +45,7 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 
 		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
 
-		uploader := NewUploader(false, s3Uploader, logrus.New())
+		uploader := NewUploader(false, 10, s3Uploader, logrus.New())
 
 		err = uploader.UploadFilesFromPathToBucket([]string{file.Name()})
 
@@ -92,7 +92,7 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 
 		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
 
-		uploader := NewUploader(false, s3Uploader, logrus.New())
+		uploader := NewUploader(false, 10, s3Uploader, logrus.New())
 		err = uploader.UploadFilesFromPathToBucket([]string{dirname})
 		c.So(err, ShouldBeNil)
 	})
@@ -106,7 +106,7 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 
 		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
 
-		uploader := NewUploader(false, s3Uploader, logrus.New())
+		uploader := NewUploader(false, 10, s3Uploader, logrus.New())
 		err := uploader.UploadFilesFromPathToBucket([]string{})
 
 		So(err, ShouldNotBeNil)

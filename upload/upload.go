@@ -2,6 +2,7 @@ package upload
 
 import (
 	"errors"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/timrourke/funnel/s3"
 	"os"
@@ -136,16 +137,18 @@ type Uploader interface {
 }
 
 type uploader struct {
-	logger           *logrus.Logger
-	shouldWatchPaths bool
-	s3Uploader       s3.S3Uploader
+	logger               *logrus.Logger
+	numConcurrentUploads int
+	shouldWatchPaths     bool
+	s3Uploader           s3.S3Uploader
 }
 
-func NewUploader(shouldWatchPaths bool, s3Uploader s3.S3Uploader, logger *logrus.Logger) Uploader {
+func NewUploader(shouldWatchPaths bool, numConcurrentUploads int, s3Uploader s3.S3Uploader, logger *logrus.Logger) Uploader {
 	return &uploader{
-		logger:           logger,
-		shouldWatchPaths: shouldWatchPaths,
-		s3Uploader:       s3Uploader,
+		logger:               logger,
+		numConcurrentUploads: numConcurrentUploads,
+		shouldWatchPaths:     shouldWatchPaths,
+		s3Uploader:           s3Uploader,
 	}
 }
 
@@ -158,22 +161,41 @@ func (u *uploader) UploadFilesFromPathToBucket(filePaths []string) error {
 
 	pending, completed, failed := make(chan *fileUploadJob), make(chan *fileUploadJob), make(chan *fileUploadJob)
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < u.numConcurrentUploads; i++ {
 		go u.handlePending(pending, completed, failed)
 	}
 
 	go func() {
 		for output := range completed {
-			uploadDuration := time.Now().Sub(output.startedAt)
-			u.logger.Printf("Uploaded file %s, took: %v", output.path, uploadDuration)
+			now := time.Now()
+			uploadDuration := now.Sub(output.startedAt)
+			u.logger.WithFields(logrus.Fields{
+				"filename": output.path,
+				"startedAt": output.startedAt.Format(time.RFC3339),
+				"completedAt": now.Format(time.RFC3339),
+				"duration": uploadDuration,
+			}).Info(fmt.Sprintf("Uploaded file %s", output.path))
 			wg.Done()
 		}
 	}()
 
 	go func() {
 		for failure := range failed {
-			failedDuration := time.Now().Sub(failure.startedAt)
-			u.logger.Printf("Failed to upload file %s with errors %s, took: %v", failure.path, failure.errors, failedDuration)
+			now := time.Now()
+			failedDuration := now.Sub(failure.startedAt)
+			var errorStrings []string
+
+			for _, err := range failure.errors {
+				errorStrings = append(errorStrings, err.Error())
+			}
+
+			u.logger.WithFields(logrus.Fields{
+				"filename": failure.path,
+				"startedAt": failure.startedAt.Format(time.RFC3339),
+				"completedAt": now.Format(time.RFC3339),
+				"duration": failedDuration,
+				"errors": errorStrings,
+			}).Info(fmt.Sprintf("Failed to upload file %s", failure.path))
 			wg.Done()
 		}
 	}()

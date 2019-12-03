@@ -23,14 +23,19 @@ func validateCommandLineFlags() error {
 		return errors.New("must specify an AWS S3 bucket to save files in")
 	}
 
+	if numConcurrentUploads <= 0 || numConcurrentUploads > 100 {
+		return errors.New("number of concurrent uploads must be within the range 1-100")
+	}
+
 	return nil
 }
 
 var (
-	bucket           string
-	log              = logrus.New()
-	shouldWatchPaths bool
-	region           string
+	bucket               string
+	log                  = logrus.New()
+	numConcurrentUploads int
+	shouldWatchPaths     bool
+	region               string
 
 	rootCmd = &cobra.Command{
 		Use:     "funnel [OPTIONS] [PATHS]",
@@ -53,7 +58,12 @@ var (
 
 			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket)
 
-			uploader := upload.NewUploader(shouldWatchPaths, s3Uploader, log)
+			uploader := upload.NewUploader(
+				shouldWatchPaths,
+				numConcurrentUploads,
+				s3Uploader,
+				log,
+			)
 
 			return uploader.UploadFilesFromPathToBucket(args)
 		},
@@ -92,6 +102,14 @@ func configureRootCmd() {
 		"w",
 		false,
 		"Whether to watch a path for changes",
+	)
+
+	rootCmd.PersistentFlags().IntVarP(
+		&numConcurrentUploads,
+		"num-concurrent-uploads",
+		"n",
+		10,
+		"Number of concurrent uploads",
 	)
 
 	rootCmd.DisableFlagsInUseLine = true
