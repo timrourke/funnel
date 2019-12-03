@@ -169,12 +169,15 @@ func (u *uploader) UploadFilesFromPathToBucket(filePaths []string) error {
 		for output := range completed {
 			now := time.Now()
 			uploadDuration := now.Sub(output.startedAt)
+
 			u.logger.WithFields(logrus.Fields{
-				"filename": output.path,
-				"startedAt": output.startedAt.Format(time.RFC3339),
-				"completedAt": now.Format(time.RFC3339),
-				"duration": uploadDuration,
+				"filename":            output.path,
+				"startedAt":           output.startedAt.Format(time.RFC3339),
+				"completedAt":         now.Format(time.RFC3339),
+				"durationPretty":      uploadDuration.String(),
+				"durationNanoseconds": uploadDuration.Nanoseconds(),
 			}).Info(fmt.Sprintf("Uploaded file %s", output.path))
+
 			wg.Done()
 		}
 	}()
@@ -190,12 +193,14 @@ func (u *uploader) UploadFilesFromPathToBucket(filePaths []string) error {
 			}
 
 			u.logger.WithFields(logrus.Fields{
-				"filename": failure.path,
-				"startedAt": failure.startedAt.Format(time.RFC3339),
-				"completedAt": now.Format(time.RFC3339),
-				"duration": failedDuration,
-				"errors": errorStrings,
+				"filename":            failure.path,
+				"startedAt":           failure.startedAt.Format(time.RFC3339),
+				"failedAt":            now.Format(time.RFC3339),
+				"durationPretty":      failedDuration.String(),
+				"durationNanoseconds": failedDuration.Nanoseconds(),
+				"errors":              errorStrings,
 			}).Info(fmt.Sprintf("Failed to upload file %s", failure.path))
+
 			wg.Done()
 		}
 	}()
