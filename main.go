@@ -116,7 +116,7 @@ func configureRootCmd() {
 
 	rootCmd.PersistentFlags().BoolVarP(
 		&shouldDeleteFileAfterUpload,
-		"should-delete-file-after-upload",
+		"delete-file-after-upload",
 		"",
 		false,
 		"Whether to delete the uploaded file after a successful upload",
