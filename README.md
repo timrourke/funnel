@@ -21,6 +21,14 @@ Flags:
   -w, --watch                        Whether to watch a path for changes
 ```
 
+## Installing funnel using go get
+
+1. Install [golang](https://golang.org/)
+2. Run `go get github.com/timrourke/funnel`
+
+Assuming you have configured your `$PATH` to include binaries in "$GOPATH/bin",
+you should now be able to run `funnel` from anywhere on your system.
+
 ## Building funnel from source
 
 1. Install [golang](https://golang.org/) and [dep](https://golang.github.io/dep/)
