@@ -10,17 +10,32 @@ import (
 	"time"
 )
 
-func handlePending(pending <-chan string, completed chan<- string, uploader s3.S3Uploader) {
+func handlePending(
+	pending chan *fileUploadJob,
+	completed chan<- *fileUploadJob,
+	failed chan<- *fileUploadJob,
+	uploader s3.S3Uploader,
+) {
 	for input := range pending {
-		err := uploader.Upload(input)
-		if err != nil {
-			log.Println("Failed to upload file:", err)
+		err := uploader.Upload(input.path)
+		if err == nil {
+			completed <- input
+			continue
 		}
-		completed <- input
+
+		input.errors = append(input.errors, err)
+
+		if len(input.errors) < 5 {
+			go func() {
+				pending <- input
+			}()
+		} else {
+			failed <- input
+		}
 	}
 }
 
-func enqueueDirContents(dirPathToWatch string, pending chan string, wg *sync.WaitGroup) {
+func enqueueDirContents(dirPathToWatch string, pending chan *fileUploadJob, wg *sync.WaitGroup) {
 	err := filepath.Walk(dirPathToWatch, func(path string, info os.FileInfo, err error) error {
 		if dirPathToWatch == path {
 			return nil
@@ -31,7 +46,11 @@ func enqueueDirContents(dirPathToWatch string, pending chan string, wg *sync.Wai
 		}
 
 		wg.Add(1)
-		pending <- path
+		pending <- &fileUploadJob{
+			path:      path,
+			errors:    []error{},
+			startedAt: time.Now(),
+		}
 
 		return nil
 	})
@@ -40,7 +59,7 @@ func enqueueDirContents(dirPathToWatch string, pending chan string, wg *sync.Wai
 	}
 }
 
-func uploadDir(filePath string, pending chan string, shouldWatchPaths bool, wg *sync.WaitGroup) {
+func uploadDir(filePath string, pending chan *fileUploadJob, shouldWatchPaths bool, wg *sync.WaitGroup) {
 	if shouldWatchPaths {
 		for {
 			enqueueDirContents(filePath, pending, wg)
@@ -52,7 +71,7 @@ func uploadDir(filePath string, pending chan string, shouldWatchPaths bool, wg *
 	}
 }
 
-func processSingleFilePath(filePath string, pending chan string, shouldWatchPaths bool, wg *sync.WaitGroup) error {
+func processSingleFilePath(filePath string, pending chan *fileUploadJob, shouldWatchPaths bool, wg *sync.WaitGroup) error {
 	filePathInfo, err := os.Stat(filePath)
 	if err != nil {
 		return err
@@ -64,20 +83,28 @@ func processSingleFilePath(filePath string, pending chan string, shouldWatchPath
 		if shouldWatchPaths {
 			for {
 				wg.Add(1)
-				pending <- filePath
+				pending <- &fileUploadJob{
+					path:      filePath,
+					errors:    []error{},
+					startedAt: time.Now(),
+				}
 
 				time.Sleep(1 * time.Second)
 			}
 		} else {
 			wg.Add(1)
-			pending <- filePath
+			pending <- &fileUploadJob{
+				path:      filePath,
+				errors:    []error{},
+				startedAt: time.Now(),
+			}
 		}
 	}
 
 	return nil
 }
 
-func processMultipleFilePaths(filePaths []string, pending chan string, shouldWatchPaths bool, wg *sync.WaitGroup) error {
+func processMultipleFilePaths(filePaths []string, pending chan *fileUploadJob, shouldWatchPaths bool, wg *sync.WaitGroup) error {
 	for _, filePath := range filePaths {
 		filePathInfo, err := os.Stat(filePath)
 		if err != nil {
@@ -88,11 +115,21 @@ func processMultipleFilePaths(filePaths []string, pending chan string, shouldWat
 			uploadDir(filePath, pending, shouldWatchPaths, wg)
 		} else {
 			wg.Add(1)
-			pending <- filePath
+			pending <- &fileUploadJob{
+				path:      filePath,
+				errors:    []error{},
+				startedAt: time.Now(),
+			}
 		}
 	}
 
 	return nil
+}
+
+type fileUploadJob struct {
+	path        string
+	errors      []error
+	startedAt   time.Time
 }
 
 func UploadFilesFromPathToBucket(filePaths []string, shouldWatchPaths bool, uploader s3.S3Uploader) error {
@@ -102,15 +139,24 @@ func UploadFilesFromPathToBucket(filePaths []string, shouldWatchPaths bool, uplo
 
 	var wg sync.WaitGroup
 
-	pending, completed := make(chan string), make(chan string)
+	pending, completed, failed := make(chan *fileUploadJob), make(chan *fileUploadJob), make(chan *fileUploadJob)
 
-	for i := 0; i < 10; i++ {
-		go handlePending(pending, completed, uploader)
+	for i := 0; i < 20; i++ {
+		go handlePending(pending, completed, failed, uploader)
 	}
 
 	go func() {
 		for output := range completed {
-			log.Println("Processed:", output)
+			uploadDuration := time.Now().Sub(output.startedAt)
+			log.Printf("Uploaded file %s, took: %v", output.path, uploadDuration)
+			wg.Done()
+		}
+	}()
+
+	go func() {
+		for failure := range failed {
+			failedDuration := time.Now().Sub(failure.startedAt)
+			log.Printf("Failed to upload file %s with errors %s, took: %v", failure.path, failure.errors, failedDuration)
 			wg.Done()
 		}
 	}()
