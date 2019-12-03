@@ -2,13 +2,14 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/timrourke/funnel/s3"
 	"github.com/timrourke/funnel/upload"
+	"golang.org/x/crypto/ssh/terminal"
 	"os"
 	"strings"
 )
@@ -25,36 +26,45 @@ func validateCommandLineFlags() error {
 	return nil
 }
 
-var bucket string
-var region string
-var shouldWatchPaths bool
+var (
+	bucket           string
+	log              = logrus.New()
+	shouldWatchPaths bool
+	region           string
 
-var rootCmd = &cobra.Command{
-	Use:     "funnel [OPTIONS] [PATHS]",
-	Short:   "Funnel is a tool for quickly saving files to AWS S3.",
-	Example: "funnel --region=us-east-1 --bucket=some-cool-bucket /some/directory",
-	Version: "0.0.1",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateCommandLineFlags()
-		if err != nil {
-			return err
-		}
+	rootCmd = &cobra.Command{
+		Use:     "funnel [OPTIONS] [PATHS]",
+		Short:   "Funnel is a tool for quickly saving files to AWS S3.",
+		Example: "funnel --region=us-east-1 --bucket=some-cool-bucket /some/directory",
+		Version: "0.0.1",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := validateCommandLineFlags()
+			if err != nil {
+				return err
+			}
 
-		config := aws.NewConfig().
-			WithRegion(region).
-			WithMaxRetries(3)
+			config := aws.NewConfig().
+				WithRegion(region).
+				WithMaxRetries(3)
 
-		sess := session.Must(session.NewSession(config))
+			sess := session.Must(session.NewSession(config))
 
-		s3UploadManager := s3manager.NewUploader(sess)
+			s3UploadManager := s3manager.NewUploader(sess)
 
-		uploader := s3.NewS3Uploader(s3UploadManager, bucket)
+			uploader := s3.NewS3Uploader(s3UploadManager, bucket)
 
-		return upload.UploadFilesFromPathToBucket(args, shouldWatchPaths, uploader)
-	},
+			return upload.UploadFilesFromPathToBucket(args, shouldWatchPaths, uploader)
+		},
+	}
+)
+
+func configureLogger() {
+	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
+		log.SetFormatter(&logrus.JSONFormatter{})
+	}
 }
 
-func init() {
+func configureRootCmd() {
 	rootCmd.PersistentFlags().StringVarP(
 		&region,
 		"region",
@@ -85,9 +95,13 @@ func init() {
 	rootCmd.DisableFlagsInUseLine = true
 }
 
+func init() {
+	configureLogger()
+	configureRootCmd()
+}
+
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println("Upload failed:", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 }
