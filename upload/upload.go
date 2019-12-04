@@ -102,7 +102,11 @@ func (u *uploader) uploadDir(
 	}
 }
 
-func (u *uploader) processSingleFilePath(filePath string, pending chan *fileUploadJob, wg *sync.WaitGroup) error {
+func (u *uploader) processSingleFilePath(
+	filePath string,
+	pending chan *fileUploadJob,
+	wg *sync.WaitGroup,
+) error {
 	filePathInfo, err := os.Stat(filePath)
 	if err != nil {
 		return err
@@ -135,7 +139,11 @@ func (u *uploader) processSingleFilePath(filePath string, pending chan *fileUplo
 	return nil
 }
 
-func (u *uploader) processMultipleFilePaths(filePaths []string, pending chan *fileUploadJob, wg *sync.WaitGroup) error {
+func (u *uploader) processMultipleFilePaths(
+	filePaths []string,
+	pending chan *fileUploadJob,
+	wg *sync.WaitGroup,
+) error {
 	for _, filePath := range filePaths {
 		filePathInfo, err := os.Stat(filePath)
 		if err != nil {
@@ -177,7 +185,13 @@ type uploader struct {
 }
 
 // NewUploader creates a new service to upload files to S3
-func NewUploader(shouldDeleteFileAfterUpload bool, shouldWatchPaths bool, numConcurrentUploads int, s3Uploader s3.S3Uploader, logger *logrus.Logger) Uploader {
+func NewUploader(
+	shouldDeleteFileAfterUpload bool,
+	shouldWatchPaths bool,
+	numConcurrentUploads int,
+	s3Uploader s3.S3Uploader,
+	logger *logrus.Logger,
+) Uploader {
 	return &uploader{
 		logger:                      logger,
 		numConcurrentUploads:        numConcurrentUploads,

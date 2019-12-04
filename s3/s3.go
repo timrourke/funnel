@@ -17,7 +17,10 @@ type S3Uploader interface {
 // narrow interface definition replaces the dependency on the `s3manager.Uploader`
 // concrete type, and aids primarily in defining simple test doubles
 type S3ManagerUploader interface {
-	Upload(input *s3manager.UploadInput, options ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error)
+	Upload(
+		input *s3manager.UploadInput,
+		options ...func(*s3manager.Uploader),
+	) (*s3manager.UploadOutput, error)
 }
 
 type s3Uploader struct {
