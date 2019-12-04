@@ -16,6 +16,7 @@ type stubS3ManagerUploader struct {
 	expectedErrorValues  chan error
 }
 
+// Upload is a stubbed implementation of `s3manager.Uploader.Upload`
 func (s *stubS3ManagerUploader) Upload(input *s3manager.UploadInput, options ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
 	s.inputsPassed <- input
 
@@ -43,9 +44,11 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 			c.So(*inputPassed.Key, ShouldEqual, file.Name())
 		}()
 
-		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
+		logger := logrus.New()
 
-		uploader := NewUploader(false, false, 10, s3Uploader, logrus.New())
+		s3Uploader := s3.NewS3Uploader(stub, "unimportant", logger)
+
+		uploader := NewUploader(false, false, 10, s3Uploader, logger)
 
 		err = uploader.UploadFilesFromPathToBucket([]string{file.Name()})
 
@@ -90,10 +93,14 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 			c.So(len(uploadedKeys), ShouldEqual, 2)
 		}()
 
-		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
+		logger := logrus.New()
 
-		uploader := NewUploader(false, false, 10, s3Uploader, logrus.New())
+		s3Uploader := s3.NewS3Uploader(stub, "unimportant", logger)
+
+		uploader := NewUploader(false, false, 10, s3Uploader, logger)
+
 		err = uploader.UploadFilesFromPathToBucket([]string{dirname})
+
 		c.So(err, ShouldBeNil)
 	})
 
@@ -104,9 +111,12 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 			expectedErrorValues:  nil,
 		}
 
-		s3Uploader := s3.NewS3Uploader(stub, "unimportant")
+		logger := logrus.New()
 
-		uploader := NewUploader(false, false, 10, s3Uploader, logrus.New())
+		s3Uploader := s3.NewS3Uploader(stub, "unimportant", logger)
+
+		uploader := NewUploader(false, false, 10, s3Uploader, logger)
+
 		err := uploader.UploadFilesFromPathToBucket([]string{})
 
 		So(err, ShouldNotBeNil)

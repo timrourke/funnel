@@ -57,7 +57,7 @@ var (
 
 			s3UploadManager := s3manager.NewUploader(sess)
 
-			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket)
+			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket, log)
 
 			uploader := upload.NewUploader(
 				shouldDeleteFileAfterUpload,

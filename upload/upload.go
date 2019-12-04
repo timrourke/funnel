@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Attempt to upload each pending filepath to AWS S3
 func (u *uploader) handlePending(
 	pending chan *fileUploadJob,
 	completed chan<- *fileUploadJob,
@@ -20,6 +21,18 @@ func (u *uploader) handlePending(
 		err := u.s3Uploader.Upload(input.path)
 		if err == nil && u.shouldDeleteFileAfterUpload {
 			err = os.Remove(input.path)
+			if err != nil && errors.Is(err, os.ErrNotExist) {
+				u.logger.WithFields(logrus.Fields{
+					"filename": input.path,
+					"error":    err.Error(),
+				}).Warnf(
+					"Attempted to delete a file that no longer exists, did something else already delete it?: %s: %w",
+					input.path,
+					err,
+				)
+				completed <- input
+				continue
+			}
 			if err != nil {
 				u.logger.WithFields(logrus.Fields{
 					"filename": input.path,
@@ -44,7 +57,12 @@ func (u *uploader) handlePending(
 	}
 }
 
-func (u *uploader) enqueueDirContents(dirPathToWatch string, pending chan *fileUploadJob, wg *sync.WaitGroup) {
+// Enqueue the contents of a directory for uploading to AWS S3
+func (u *uploader) enqueueDirContents(
+	dirPathToWatch string,
+	pending chan *fileUploadJob,
+	wg *sync.WaitGroup,
+) {
 	err := filepath.Walk(dirPathToWatch, func(path string, info os.FileInfo, err error) error {
 		if dirPathToWatch == path {
 			return nil
@@ -68,7 +86,11 @@ func (u *uploader) enqueueDirContents(dirPathToWatch string, pending chan *fileU
 	}
 }
 
-func (u *uploader) uploadDir(filePath string, pending chan *fileUploadJob, wg *sync.WaitGroup) {
+func (u *uploader) uploadDir(
+	filePath string,
+	pending chan *fileUploadJob,
+	wg *sync.WaitGroup,
+) {
 	if u.shouldWatchPaths {
 		for {
 			u.enqueueDirContents(filePath, pending, wg)
@@ -141,6 +163,7 @@ type fileUploadJob struct {
 	startedAt time.Time
 }
 
+// Uploader uploads files from one or more local paths to AWS S3
 type Uploader interface {
 	UploadFilesFromPathToBucket(filePaths []string) error
 }
@@ -153,6 +176,7 @@ type uploader struct {
 	s3Uploader                  s3.S3Uploader
 }
 
+// NewUploader creates a new service to upload files to S3
 func NewUploader(shouldDeleteFileAfterUpload bool, shouldWatchPaths bool, numConcurrentUploads int, s3Uploader s3.S3Uploader, logger *logrus.Logger) Uploader {
 	return &uploader{
 		logger:                      logger,
@@ -163,6 +187,7 @@ func NewUploader(shouldDeleteFileAfterUpload bool, shouldWatchPaths bool, numCon
 	}
 }
 
+// UploadFilesFromPathToBucket uploads a list of files at the given paths to AWS S3
 func (u *uploader) UploadFilesFromPathToBucket(filePaths []string) error {
 	if 0 == len(filePaths) {
 		return errors.New("must provide at least one path to a file or directory to upload to AWS S3")
