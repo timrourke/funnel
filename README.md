@@ -1,6 +1,6 @@
 # funnel
 
-[![CircleCI](https://circleci.com/gh/timrourke/funnel.svg?style=svg)](https://circleci.com/gh/timrourke/funnel) [![codecov](https://codecov.io/gh/timrourke/funnel/branch/master/graph/badge.svg)](https://codecov.io/gh/timrourke/funnel)
+[![CircleCI](https://circleci.com/gh/timrourke/funnel.svg?style=svg)](https://circleci.com/gh/timrourke/funnel) [![codecov](https://codecov.io/gh/timrourke/funnel/branch/master/graph/badge.svg)](https://codecov.io/gh/timrourke/funnel) [![GoDoc](https://godoc.org/github.com/timrourke/funnel/upload?status.svg)](https://godoc.org/github.com/timrourke/funnel/upload)
 
 ```
 Funnel is a tool for quickly saving files to AWS S3.

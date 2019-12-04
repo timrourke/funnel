@@ -1,3 +1,7 @@
+// Package upload defines a service for uploading one or more file paths to AWS
+// S3. Uploading each individual file should happen in a non-blocking manner.
+// The work of actually calling to the AWS SDK for S3 is delegated to the `s3`
+// package.
 package upload
 
 import (

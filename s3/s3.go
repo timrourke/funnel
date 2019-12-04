@@ -1,3 +1,4 @@
+// Package s3 defines a service for calling into the S3 client the AWS SDK exposes
 package s3
 
 import (
