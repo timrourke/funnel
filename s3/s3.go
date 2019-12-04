@@ -12,7 +12,7 @@ import (
 
 // S3Uploader uploads files to AWS S3
 type S3Uploader interface {
-	Upload(path string) error
+	Upload(path string, key string) error
 }
 
 // S3ManagerUploader knows how to use the AWS S3 SDK to upload files. This more
@@ -32,7 +32,7 @@ type s3Uploader struct {
 }
 
 // Upload a file with a given path to AWS S3
-func (s *s3Uploader) Upload(path string) error {
+func (s *s3Uploader) Upload(path string, key string) error {
 	file, err := os.Open(path)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		s.logger.WithFields(logrus.Fields{
@@ -57,7 +57,7 @@ func (s *s3Uploader) Upload(path string) error {
 	input := &s3manager.UploadInput{
 		Body:   file,
 		Bucket: aws.String(s.toBucket),
-		Key:    aws.String(path),
+		Key:    aws.String(key),
 	}
 
 	_, err = s.s3UploadManager.Upload(input)

@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/timrourke/funnel/s3"
+	"github.com/timrourke/funnel/tpl"
 	"github.com/timrourke/funnel/upload"
 	"golang.org/x/crypto/ssh/terminal"
 	"os"
@@ -34,6 +35,7 @@ var (
 	bucket                      string
 	log                         = logrus.New()
 	numConcurrentUploads        int
+	s3ObjectKeyTemplate         string
 	shouldDeleteFileAfterUpload bool
 	shouldWatchPaths            bool
 	region                      string
@@ -59,11 +61,17 @@ var (
 
 			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket, log)
 
+			keyTemplate, err := tpl.NewKeyTemplate(s3ObjectKeyTemplate, log)
+			if err != nil {
+				return err
+			}
+
 			uploader := upload.NewUploader(
 				shouldDeleteFileAfterUpload,
 				shouldWatchPaths,
 				numConcurrentUploads,
 				s3Uploader,
+				keyTemplate,
 				log,
 			)
 
@@ -120,6 +128,14 @@ func configureRootCmd() {
 		"",
 		false,
 		"Whether to delete the uploaded file after a successful upload",
+	)
+
+	rootCmd.PersistentFlags().StringVarP(
+		&s3ObjectKeyTemplate,
+		"s3-object-key-template",
+		"t",
+		"{{ filePath }}",
+		"The layout template to use for defining the key of an uploaded file",
 	)
 
 	rootCmd.DisableFlagsInUseLine = true

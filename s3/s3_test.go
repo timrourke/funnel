@@ -47,7 +47,7 @@ func TestS3Uploader_Upload(t *testing.T) {
 
 		uploader := NewS3Uploader(stub, expectedBucket, logrus.New())
 
-		err := uploader.Upload(expectedPath)
+		err := uploader.Upload(expectedPath, expectedPath)
 
 		So(err, ShouldBeNil)
 
@@ -78,7 +78,7 @@ func TestS3Uploader_Upload(t *testing.T) {
 
 		uploader := NewS3Uploader(stub, "some-bucket", logrus.New())
 
-		err := uploader.Upload("a nonexistent path")
+		err := uploader.Upload("a nonexistent path", "unimportant")
 
 		So(err, ShouldNotBeNil)
 		So(err, ShouldHaveSameTypeAs, &os.PathError{})
@@ -96,7 +96,7 @@ func TestS3Uploader_Upload(t *testing.T) {
 
 		uploader := NewS3Uploader(stub, "some-bucket", logrus.New())
 
-		err := uploader.Upload("/dev/null")
+		err := uploader.Upload("/dev/null", "unimportant")
 
 		So(err, ShouldEqual, expectedError)
 	})

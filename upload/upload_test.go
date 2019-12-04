@@ -5,6 +5,7 @@ import (
 	"github.com/sirupsen/logrus"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/timrourke/funnel/s3"
+	"github.com/timrourke/funnel/tpl"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -48,7 +49,12 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 
 		s3Uploader := s3.NewS3Uploader(stub, "unimportant", logger)
 
-		uploader := NewUploader(false, false, 10, s3Uploader, logger)
+		keyTemplate, err := tpl.NewKeyTemplate("{{ filePath }}", logger)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		uploader := NewUploader(false, false, 10, s3Uploader, keyTemplate, logger)
 
 		err = uploader.UploadFilesFromPathToBucket([]string{file.Name()})
 
@@ -97,7 +103,12 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 
 		s3Uploader := s3.NewS3Uploader(stub, "unimportant", logger)
 
-		uploader := NewUploader(false, false, 10, s3Uploader, logger)
+		keyTemplate, err := tpl.NewKeyTemplate("{{ filePath }}", logger)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		uploader := NewUploader(false, false, 10, s3Uploader, keyTemplate, logger)
 
 		err = uploader.UploadFilesFromPathToBucket([]string{dirname})
 
@@ -115,9 +126,14 @@ func TestUploadFilesFromPathToBucket(t *testing.T) {
 
 		s3Uploader := s3.NewS3Uploader(stub, "unimportant", logger)
 
-		uploader := NewUploader(false, false, 10, s3Uploader, logger)
+		keyTemplate, err := tpl.NewKeyTemplate("{{ filePath }}", logger)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		err := uploader.UploadFilesFromPathToBucket([]string{})
+		uploader := NewUploader(false, false, 10, s3Uploader, keyTemplate, logger)
+
+		err = uploader.UploadFilesFromPathToBucket([]string{})
 
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, "must provide at least one path to a file or directory to upload to AWS S3")

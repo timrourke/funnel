@@ -9,11 +9,120 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/timrourke/funnel/s3"
+	"github.com/timrourke/funnel/tpl"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 )
+
+// Uploader uploads files from one or more local paths to AWS S3
+type Uploader interface {
+	UploadFilesFromPathToBucket(filePaths []string) error
+}
+
+type uploader struct {
+	keyTemplate                 tpl.KeyTemplate
+	logger                      *logrus.Logger
+	numConcurrentUploads        int
+	shouldDeleteFileAfterUpload bool
+	shouldWatchPaths            bool
+	s3Uploader                  s3.S3Uploader
+}
+
+// NewUploader creates a new service to upload files to S3
+func NewUploader(
+	shouldDeleteFileAfterUpload bool,
+	shouldWatchPaths bool,
+	numConcurrentUploads int,
+	s3Uploader s3.S3Uploader,
+	keyTemplate tpl.KeyTemplate,
+	logger *logrus.Logger,
+) Uploader {
+	return &uploader{
+		keyTemplate:                 keyTemplate,
+		logger:                      logger,
+		numConcurrentUploads:        numConcurrentUploads,
+		shouldDeleteFileAfterUpload: shouldDeleteFileAfterUpload,
+		shouldWatchPaths:            shouldWatchPaths,
+		s3Uploader:                  s3Uploader,
+	}
+}
+
+// UploadFilesFromPathToBucket uploads a list of files at the given paths to AWS S3
+func (u *uploader) UploadFilesFromPathToBucket(filePaths []string) error {
+	if 0 == len(filePaths) {
+		return errors.New("must provide at least one path to a file or directory to upload to AWS S3")
+	}
+
+	var wg sync.WaitGroup
+
+	pending, completed, failed := make(chan *fileUploadJob), make(chan *fileUploadJob), make(chan *fileUploadJob)
+
+	for i := 0; i < u.numConcurrentUploads; i++ {
+		go u.handlePending(pending, completed, failed)
+	}
+
+	go func() {
+		for output := range completed {
+			now := time.Now()
+			uploadDuration := now.Sub(output.startedAt)
+
+			u.logger.WithFields(logrus.Fields{
+				"filename":            output.path,
+				"startedAt":           output.startedAt.Format(time.RFC3339),
+				"completedAt":         now.Format(time.RFC3339),
+				"durationPretty":      uploadDuration.String(),
+				"durationNanoseconds": uploadDuration.Nanoseconds(),
+			}).Info(fmt.Sprintf("Uploaded file %s", output.path))
+
+			wg.Done()
+		}
+	}()
+
+	go func() {
+		for failure := range failed {
+			now := time.Now()
+			failedDuration := now.Sub(failure.startedAt)
+			var errorStrings []string
+
+			for _, err := range failure.errors {
+				errorStrings = append(errorStrings, err.Error())
+			}
+
+			u.logger.WithFields(logrus.Fields{
+				"filename":            failure.path,
+				"startedAt":           failure.startedAt.Format(time.RFC3339),
+				"failedAt":            now.Format(time.RFC3339),
+				"durationPretty":      failedDuration.String(),
+				"durationNanoseconds": failedDuration.Nanoseconds(),
+				"errors":              errorStrings,
+			}).Info(fmt.Sprintf("Failed to upload file %s", failure.path))
+
+			wg.Done()
+		}
+	}()
+
+	if 1 == len(filePaths) {
+		err := u.processSingleFilePath(filePaths[0], pending, &wg)
+		if err != nil {
+			return err
+		}
+	} else {
+		if u.shouldWatchPaths {
+			return errors.New("watching multiple paths not supported")
+		}
+
+		err := u.processMultipleFilePaths(filePaths, pending, &wg)
+		if err != nil {
+			return err
+		}
+	}
+
+	wg.Wait()
+
+	return nil
+}
 
 // Attempt to upload each pending filepath to AWS S3
 func (u *uploader) handlePending(
@@ -22,7 +131,15 @@ func (u *uploader) handlePending(
 	failed chan<- *fileUploadJob,
 ) {
 	for input := range pending {
-		err := u.s3Uploader.Upload(input.path)
+		key, err := u.keyTemplate.KeyForFile(input.path)
+		if err != nil {
+			u.logger.WithFields(logrus.Fields{
+				"filename": input.path,
+				"error":    err,
+			}).Errorf("Failed to parse template for S3 object key: %w", err)
+		}
+
+		err = u.s3Uploader.Upload(input.path, key)
 		if err == nil && u.shouldDeleteFileAfterUpload {
 			err = os.Remove(input.path)
 			if err != nil && errors.Is(err, os.ErrNotExist) {
@@ -173,109 +290,4 @@ type fileUploadJob struct {
 	path      string
 	errors    []error
 	startedAt time.Time
-}
-
-// Uploader uploads files from one or more local paths to AWS S3
-type Uploader interface {
-	UploadFilesFromPathToBucket(filePaths []string) error
-}
-
-type uploader struct {
-	logger                      *logrus.Logger
-	numConcurrentUploads        int
-	shouldDeleteFileAfterUpload bool
-	shouldWatchPaths            bool
-	s3Uploader                  s3.S3Uploader
-}
-
-// NewUploader creates a new service to upload files to S3
-func NewUploader(
-	shouldDeleteFileAfterUpload bool,
-	shouldWatchPaths bool,
-	numConcurrentUploads int,
-	s3Uploader s3.S3Uploader,
-	logger *logrus.Logger,
-) Uploader {
-	return &uploader{
-		logger:                      logger,
-		numConcurrentUploads:        numConcurrentUploads,
-		shouldDeleteFileAfterUpload: shouldDeleteFileAfterUpload,
-		shouldWatchPaths:            shouldWatchPaths,
-		s3Uploader:                  s3Uploader,
-	}
-}
-
-// UploadFilesFromPathToBucket uploads a list of files at the given paths to AWS S3
-func (u *uploader) UploadFilesFromPathToBucket(filePaths []string) error {
-	if 0 == len(filePaths) {
-		return errors.New("must provide at least one path to a file or directory to upload to AWS S3")
-	}
-
-	var wg sync.WaitGroup
-
-	pending, completed, failed := make(chan *fileUploadJob), make(chan *fileUploadJob), make(chan *fileUploadJob)
-
-	for i := 0; i < u.numConcurrentUploads; i++ {
-		go u.handlePending(pending, completed, failed)
-	}
-
-	go func() {
-		for output := range completed {
-			now := time.Now()
-			uploadDuration := now.Sub(output.startedAt)
-
-			u.logger.WithFields(logrus.Fields{
-				"filename":            output.path,
-				"startedAt":           output.startedAt.Format(time.RFC3339),
-				"completedAt":         now.Format(time.RFC3339),
-				"durationPretty":      uploadDuration.String(),
-				"durationNanoseconds": uploadDuration.Nanoseconds(),
-			}).Info(fmt.Sprintf("Uploaded file %s", output.path))
-
-			wg.Done()
-		}
-	}()
-
-	go func() {
-		for failure := range failed {
-			now := time.Now()
-			failedDuration := now.Sub(failure.startedAt)
-			var errorStrings []string
-
-			for _, err := range failure.errors {
-				errorStrings = append(errorStrings, err.Error())
-			}
-
-			u.logger.WithFields(logrus.Fields{
-				"filename":            failure.path,
-				"startedAt":           failure.startedAt.Format(time.RFC3339),
-				"failedAt":            now.Format(time.RFC3339),
-				"durationPretty":      failedDuration.String(),
-				"durationNanoseconds": failedDuration.Nanoseconds(),
-				"errors":              errorStrings,
-			}).Info(fmt.Sprintf("Failed to upload file %s", failure.path))
-
-			wg.Done()
-		}
-	}()
-
-	if 1 == len(filePaths) {
-		err := u.processSingleFilePath(filePaths[0], pending, &wg)
-		if err != nil {
-			return err
-		}
-	} else {
-		if u.shouldWatchPaths {
-			return errors.New("watching multiple paths not supported")
-		}
-
-		err := u.processMultipleFilePaths(filePaths, pending, &wg)
-		if err != nil {
-			return err
-		}
-	}
-
-	wg.Wait()
-
-	return nil
 }
