@@ -33,7 +33,7 @@ func validateCommandLineFlags() error {
 
 var (
 	bucket                      string
-	log                         = logrus.New()
+	logger                      = logrus.New()
 	numConcurrentUploads        int
 	s3ObjectKeyTemplate         string
 	shouldDeleteFileAfterUpload bool
@@ -59,9 +59,9 @@ var (
 
 			s3UploadManager := s3manager.NewUploader(sess)
 
-			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket, log)
+			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket, logger)
 
-			keyTemplate, err := tpl.NewKeyTemplate(s3ObjectKeyTemplate, log)
+			keyTemplate, err := tpl.NewKeyTemplate(s3ObjectKeyTemplate, logger)
 			if err != nil {
 				return err
 			}
@@ -72,7 +72,7 @@ var (
 				numConcurrentUploads,
 				s3Uploader,
 				keyTemplate,
-				log,
+				logger,
 			)
 
 			return uploader.UploadFilesFromPathToBucket(args)
@@ -82,7 +82,7 @@ var (
 
 func configureLogger() {
 	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
-		log.SetFormatter(&logrus.JSONFormatter{})
+		logger.SetFormatter(&logrus.JSONFormatter{})
 	}
 }
 
@@ -148,6 +148,6 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 }
