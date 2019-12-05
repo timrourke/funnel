@@ -46,39 +46,44 @@ var (
 		Example: "funnel --region=us-east-1 --bucket=some-cool-bucket /some/directory",
 		Version: "0.0.1",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := validateCommandLineFlags()
-			if err != nil {
-				return err
-			}
-
-			config := aws.NewConfig().
-				WithRegion(region).
-				WithMaxRetries(3)
-
-			sess := session.Must(session.NewSession(config))
-
-			s3UploadManager := s3manager.NewUploader(sess)
-
-			s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket, logger)
-
-			keyTemplate, err := tpl.NewKeyTemplate(s3ObjectKeyTemplate, logger)
-			if err != nil {
-				return err
-			}
-
-			uploader := upload.NewUploader(
-				shouldDeleteFileAfterUpload,
-				shouldWatchPaths,
-				numConcurrentUploads,
-				s3Uploader,
-				keyTemplate,
-				logger,
-			)
-
-			return uploader.UploadFilesFromPathToBucket(args)
+			return Execute(cmd, args)
 		},
 	}
 )
+
+// Execute configures the application and executes the root cobra command
+func Execute(cmd *cobra.Command, args []string) error {
+	err := validateCommandLineFlags()
+	if err != nil {
+		return err
+	}
+
+	config := aws.NewConfig().
+		WithRegion(region).
+		WithMaxRetries(3)
+
+	sess := session.Must(session.NewSession(config))
+
+	s3UploadManager := s3manager.NewUploader(sess)
+
+	s3Uploader := s3.NewS3Uploader(s3UploadManager, bucket, logger)
+
+	keyTemplate, err := tpl.NewKeyTemplate(s3ObjectKeyTemplate, logger)
+	if err != nil {
+		return err
+	}
+
+	uploader := upload.NewUploader(
+		shouldDeleteFileAfterUpload,
+		shouldWatchPaths,
+		numConcurrentUploads,
+		s3Uploader,
+		keyTemplate,
+		logger,
+	)
+
+	return uploader.UploadFilesFromPathToBucket(args)
+}
 
 func configureLogger() {
 	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
