@@ -13,6 +13,8 @@ import (
 
 var (
 	fixture1                     *os.File
+	fixture2                     *os.File
+	fixture3                     *os.File
 	funnelTestAwsAccessKeyId     = os.Getenv("FUNNEL_TEST_AWS_ACCESS_KEY_ID")
 	funnelTestAwsDefaultRegion   = os.Getenv("FUNNEL_TEST_AWS_DEFAULT_REGION")
 	funnelTestAwsSecretAccessKey = os.Getenv("FUNNEL_TEST_AWS_SECRET_ACCESS_KEY")
@@ -67,6 +69,20 @@ func createFixtures() {
 	}
 
 	fixture1 = file
+
+	file, err = ioutil.TempFile(os.TempDir(), "somefile2.txt")
+	if err != nil {
+		panic(err)
+	}
+
+	fixture2 = file
+
+	file, err = ioutil.TempFile(os.TempDir(), "somefile3.txt")
+	if err != nil {
+		panic(err)
+	}
+
+	fixture3 = file
 }
 
 func deleteAllObjsInBucket(listObjectsInput *s3.ListObjectsInput, s3Client *s3.S3) {
@@ -99,7 +115,7 @@ func deleteAllObjsInBucket(listObjectsInput *s3.ListObjectsInput, s3Client *s3.S
 func funnelTestBucketContainsObjectWithKey(key string) bool {
 	_, err := s3Client.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(funnelTestAwsS3Bucket),
-		Key: aws.String(key),
+		Key:    aws.String(key),
 	})
 
 	if err != nil {
@@ -126,6 +142,23 @@ func TestExecute(t *testing.T) {
 			}
 
 			So(funnelTestBucketContainsObjectWithKey(fixture1.Name()), ShouldBeTrue)
+		})
+
+		Convey("Should upload multiple files", func() {
+			cleanUpBucket()
+			defer resetCliFlags()
+
+			bucket = funnelTestAwsS3Bucket
+			numConcurrentUploads = 10
+			region = funnelTestAwsDefaultRegion
+
+			err := Execute(rootCmd, []string{fixture2.Name(), fixture3.Name()})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			So(funnelTestBucketContainsObjectWithKey(fixture2.Name()), ShouldBeTrue)
+			So(funnelTestBucketContainsObjectWithKey(fixture3.Name()), ShouldBeTrue)
 		})
 	})
 
