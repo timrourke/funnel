@@ -1,9 +1,49 @@
 package main
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	. "github.com/smartystreets/goconvey/convey"
+	"io/ioutil"
+	"os"
 	"testing"
 )
+
+var (
+	fixture1                     *os.File
+	funnelTestAwsAccessKeyId     = os.Getenv("FUNNEL_TEST_AWS_ACCESS_KEY_ID")
+	funnelTestAwsDefaultRegion   = os.Getenv("FUNNEL_TEST_AWS_DEFAULT_REGION")
+	funnelTestAwsSecretAccessKey = os.Getenv("FUNNEL_TEST_AWS_SECRET_ACCESS_KEY")
+	funnelTestAwsS3Bucket        = os.Getenv("FUNNEL_TEST_AWS_S3_BUCKET")
+	s3Client                     *s3.S3
+)
+
+func TestMain(m *testing.M) {
+	setup()
+	code := m.Run()
+	os.Exit(code)
+}
+
+func setup() {
+	creds := credentials.NewStaticCredentials(
+		funnelTestAwsAccessKeyId,
+		funnelTestAwsSecretAccessKey,
+		"",
+	)
+
+	config := aws.NewConfig().
+		WithRegion(funnelTestAwsDefaultRegion).
+		WithCredentials(creds)
+
+	sess := session.Must(session.NewSession(config))
+
+	s3Client = s3.New(sess)
+
+	resetCliFlags()
+	createFixtures()
+}
 
 func resetCliFlags() {
 	bucket = ""
@@ -11,7 +51,84 @@ func resetCliFlags() {
 	region = ""
 }
 
+func cleanUpBucket() {
+	deleteAllObjsInBucket(
+		&s3.ListObjectsInput{
+			Bucket: aws.String(funnelTestAwsS3Bucket),
+		},
+		s3Client,
+	)
+}
+
+func createFixtures() {
+	file, err := ioutil.TempFile(os.TempDir(), "somefile.txt")
+	if err != nil {
+		panic(err)
+	}
+
+	fixture1 = file
+}
+
+func deleteAllObjsInBucket(listObjectsInput *s3.ListObjectsInput, s3Client *s3.S3) {
+	objectListing, err := s3Client.ListObjects(listObjectsInput)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, obj := range objectListing.Contents {
+		_, err := s3Client.DeleteObject(&s3.DeleteObjectInput{
+			Bucket: aws.String(funnelTestAwsS3Bucket),
+			Key:    obj.Key,
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if *objectListing.IsTruncated {
+		deleteAllObjsInBucket(
+			&s3.ListObjectsInput{
+				Bucket: aws.String(funnelTestAwsS3Bucket),
+				Marker: objectListing.Marker,
+			},
+			s3Client,
+		)
+	}
+}
+
+func funnelTestBucketContainsObjectWithKey(key string) bool {
+	_, err := s3Client.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(funnelTestAwsS3Bucket),
+		Key: aws.String(key),
+	})
+
+	if err != nil {
+		logger.Error(err)
+		return false
+	}
+
+	return true
+}
+
 func TestExecute(t *testing.T) {
+	Convey("Uploading files", t, func() {
+		Convey("Should upload a single file", func() {
+			cleanUpBucket()
+			defer resetCliFlags()
+
+			bucket = funnelTestAwsS3Bucket
+			numConcurrentUploads = 10
+			region = funnelTestAwsDefaultRegion
+
+			err := Execute(rootCmd, []string{fixture1.Name()})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			So(funnelTestBucketContainsObjectWithKey(fixture1.Name()), ShouldBeTrue)
+		})
+	})
+
 	Convey("Command line flag validation", t, func() {
 		Convey("Should fail if region is empty", func() {
 			defer resetCliFlags()
