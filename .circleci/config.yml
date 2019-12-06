@@ -8,6 +8,6 @@ jobs:
     steps:
       - checkout
 
-      - run: go get -v -t -d ./...
+      - run: dep ensure
       - run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
       - run: bash <(curl -s https://codecov.io/bash)
