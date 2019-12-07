@@ -15,6 +15,8 @@ var (
 	fixture1                     *os.File
 	fixture2                     *os.File
 	fixture3                     *os.File
+	fixture4                     *os.File
+	fixtureDir1                  string
 	funnelTestAwsAccessKeyId     = os.Getenv("FUNNEL_TEST_AWS_ACCESS_KEY_ID")
 	funnelTestAwsDefaultRegion   = os.Getenv("FUNNEL_TEST_AWS_DEFAULT_REGION")
 	funnelTestAwsSecretAccessKey = os.Getenv("FUNNEL_TEST_AWS_SECRET_ACCESS_KEY")
@@ -83,6 +85,20 @@ func createFixtures() {
 	}
 
 	fixture3 = file
+
+	dir, err := ioutil.TempDir(os.TempDir(), "somedir")
+	if err != nil {
+		panic(err)
+	}
+
+	fixtureDir1 = dir
+
+	file, err = ioutil.TempFile(dir, "somefileindir1.txt")
+	if err != nil {
+		panic(err)
+	}
+
+	fixture4 = file
 }
 
 func deleteAllObjsInBucket(listObjectsInput *s3.ListObjectsInput, s3Client *s3.S3) {
@@ -159,6 +175,22 @@ func TestExecute(t *testing.T) {
 
 			So(funnelTestBucketContainsObjectWithKey(fixture2.Name()), ShouldBeTrue)
 			So(funnelTestBucketContainsObjectWithKey(fixture3.Name()), ShouldBeTrue)
+		})
+
+		Convey("Should upload directory with a single file in it", func() {
+			cleanUpBucket()
+			defer resetCliFlags()
+
+			bucket = funnelTestAwsS3Bucket
+			numConcurrentUploads = 10
+			region = funnelTestAwsDefaultRegion
+
+			err := Execute(rootCmd, []string{fixtureDir1})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			So(funnelTestBucketContainsObjectWithKey(fixture4.Name()), ShouldBeTrue)
 		})
 	})
 
