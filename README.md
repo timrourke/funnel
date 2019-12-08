@@ -28,7 +28,7 @@ Flags:
 1. Install [golang](https://golang.org/)
 2. Run `go get github.com/timrourke/funnel`
 
-Assuming you have configured your `$PATH` to include binaries in "$GOPATH/bin",
+Assuming you have configured your `$PATH` to include binaries in `"$GOPATH/bin"`,
 you should now be able to run `funnel` from anywhere on your system.
 
 ## Building funnel from source
@@ -48,9 +48,13 @@ set. Otherwise, pass the AWS region as a CLI flag.
 
 If you want to continually poll a directory for new files and upload them, you
 can use the `--watch` flag to enable this behavior. This may be especially
-useful in the case you want to also delete files following successful upload.
-This will allow you to constantly sync a directory's new contents to an S3
-bucket without filling up your disk.
+useful in the case you want to also delete files following successful upload, by
+using the funnel option `--delete-file-after-upload`. This will allow you to
+constantly sync a directory's new contents to an S3 bucket without filling up
+your disk.
+
+Paths are polled one second after the last found file was successfully uploaded
+in the last polling operation.
 
 ## Customizing the keys of uploaded S3 objects
 
@@ -93,6 +97,7 @@ Note that the date above, `2006-01-02`, is special as far as Go's date format
 parsing is concerned. You can learn more about [how Go parses date formats here](https://gobyexample.com/time-formatting-parsing)
 and also [here](https://golang.org/pkg/time/#Time.Format).
 
-Finally, note that wrapping double-quotes are needed for any Go template function that
-takes string arguments (eg. `dateWithFormat`), but when calling funnel, you will
-need to escape those double quotes (see the `dateWithFormat` example above).
+Finally, note that string arguments passed to Go template functions must be
+wrapped in double quotes to be parsed correctly (eg. `dateWithFormat`), but when
+calling funnel, you may need to escape those double quotes (see the
+`dateWithFormat` example above).
