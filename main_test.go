@@ -192,6 +192,30 @@ func TestExecute(t *testing.T) {
 
 			So(funnelTestBucketContainsObjectWithKey(fixture4.Name()), ShouldBeTrue)
 		})
+
+		Convey("Should upload multiple files and a directory containing a file", func() {
+			cleanUpBucket()
+			defer resetCliFlags()
+
+			bucket = funnelTestAwsS3Bucket
+			numConcurrentUploads = 10
+			region = funnelTestAwsDefaultRegion
+
+			err := Execute(rootCmd, []string{
+				fixtureDir1,
+				fixture1.Name(),
+				fixture2.Name(),
+				fixture3.Name(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			So(funnelTestBucketContainsObjectWithKey(fixture1.Name()), ShouldBeTrue)
+			So(funnelTestBucketContainsObjectWithKey(fixture2.Name()), ShouldBeTrue)
+			So(funnelTestBucketContainsObjectWithKey(fixture3.Name()), ShouldBeTrue)
+			So(funnelTestBucketContainsObjectWithKey(fixture4.Name()), ShouldBeTrue)
+		})
 	})
 
 	Convey("Command line flag validation", t, func() {
